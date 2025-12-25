@@ -1,6 +1,3 @@
-const voices = window.speechSynthesis.getVoices();
-console.log(voices);
-
 const warmUp = new SpeechSynthesisUtterance(" ");
 warmUp.volume = 0;
 window.speechSynthesis.speak(warmUp);
