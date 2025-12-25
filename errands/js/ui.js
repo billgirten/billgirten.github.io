@@ -19,16 +19,72 @@ export function renderRouteList(routes, onSelectRoute) {
     return;
   }
 
+  // Searchable select
+  const select = document.createElement("select");
+  select.className = "route-select";
+  select.size = 1; // collapsed by default
+
+  // Placeholder
+  const placeholder = document.createElement("option");
+  placeholder.textContent = "Select a route…";
+  placeholder.value = "";
+  select.appendChild(placeholder);
+
+  // Add all options
   routes.forEach((route) => {
-    const btn = document.createElement("button");
-    btn.className = "secondary-btn";
-    btn.textContent = `${route.name} (${(route.totalDistance / 1000).toFixed(
-      1
-    )} km)`;
-    btn.addEventListener("click", () => onSelectRoute(route));
-    container.appendChild(btn);
+    const opt = document.createElement("option");
+    opt.value = route.id;
+    opt.textContent = `${route.name} (${(route.totalDistance / 1000).toFixed(1)} km)`;
+    select.appendChild(opt);
+  });
+
+  container.appendChild(select);
+
+  /* -------------------------------------------------------
+     AUTO‑OPEN + FILTER ON TYPING
+  ------------------------------------------------------- */
+  let typingTimer = null;
+  let filterText = "";
+
+  select.addEventListener("keydown", (e) => {
+    // Ignore navigation keys
+    if (["ArrowUp", "ArrowDown", "Enter"].includes(e.key)) return;
+
+    // Build filter text
+    if (e.key.length === 1) {
+      filterText += e.key.toLowerCase();
+    } else if (e.key === "Backspace") {
+      filterText = filterText.slice(0, -1);
+    }
+
+    // Expand select to show up to 6 items
+    select.size = 6;
+
+    // Filter options
+    Array.from(select.options).forEach((opt, index) => {
+      if (index === 0) return; // keep placeholder
+      const match = opt.textContent.toLowerCase().includes(filterText);
+      opt.style.display = match ? "block" : "none";
+    });
+
+    // Reset collapse timer
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+      filterText = "";
+      select.size = 1; // collapse back
+      Array.from(select.options).forEach((opt) => (opt.style.display = "block"));
+    }, 800);
+  });
+
+  /* -------------------------------------------------------
+     SELECT HANDLER
+  ------------------------------------------------------- */
+  select.addEventListener("change", () => {
+    const selected = routes.find((r) => r.id === select.value);
+    if (selected) onSelectRoute(selected);
   });
 }
+
 
 export function updateNavigationUI(state, activeRoute) {
   const nameEl = document.getElementById("route-name");
