@@ -15,7 +15,11 @@ let navigatorInstance = null;
 let activeRoute = null;
 let deferredPrompt = null;
 
+/* -------------------------------------------------------
+   INSTALL PROMPT HANDLING (Android Chrome)
+------------------------------------------------------- */
 window.addEventListener("beforeinstallprompt", (e) => {
+  // Prevent Chrome from showing its automatic banner
   e.preventDefault();
   deferredPrompt = e;
 
@@ -27,13 +31,18 @@ export function installPWA() {
   if (!deferredPrompt) return;
 
   deferredPrompt.prompt();
+
   deferredPrompt.userChoice.then(() => {
     deferredPrompt = null;
+
     const installBtn = document.getElementById("install-btn");
     if (installBtn) installBtn.style.display = "none";
   });
 }
 
+/* -------------------------------------------------------
+   SERVICE WORKER
+------------------------------------------------------- */
 async function initServiceWorker() {
   if ("serviceWorker" in navigator) {
     try {
@@ -44,6 +53,9 @@ async function initServiceWorker() {
   }
 }
 
+/* -------------------------------------------------------
+   MAIN APP INITIALIZATION
+------------------------------------------------------- */
 async function initApp() {
   setStatus("Initializing…");
 
@@ -70,17 +82,19 @@ async function initApp() {
 
   setStatus("Ready.");
 
-  // Setup repeat button
+  /* -------------------------------------------------------
+     BUTTON: Repeat instruction
+  ------------------------------------------------------- */
   const repeatBtn = document.getElementById("repeat-btn");
   if (repeatBtn) {
     repeatBtn.addEventListener("click", () => {
-      if (navigatorInstance) {
-        navigatorInstance.repeat();
-      }
+      if (navigatorInstance) navigatorInstance.repeat();
     });
   }
 
-  // Mute toggle
+  /* -------------------------------------------------------
+     BUTTON: Mute / Unmute TTS
+  ------------------------------------------------------- */
   const muteBtn = document.getElementById("mute-btn");
   if (muteBtn) {
     muteBtn.addEventListener("click", () => {
@@ -90,7 +104,17 @@ async function initApp() {
     });
   }
 
-  // Start geolocation
+  /* -------------------------------------------------------
+     BUTTON: Install PWA (recommended wiring)
+  ------------------------------------------------------- */
+  const installBtn = document.getElementById("install-btn");
+  if (installBtn) {
+    installBtn.addEventListener("click", installPWA);
+  }
+
+  /* -------------------------------------------------------
+     START: Geolocation tracking
+  ------------------------------------------------------- */
   geoWatchId = watchPosition(
     (pos) => {
       setGeoStatus(
@@ -98,6 +122,7 @@ async function initApp() {
           5
         )} (±${Math.round(pos.accuracy)}m)`
       );
+
       if (navigatorInstance) {
         navigatorInstance.updatePosition(pos);
       }
@@ -109,6 +134,9 @@ async function initApp() {
   );
 }
 
+/* -------------------------------------------------------
+   LIFECYCLE EVENTS
+------------------------------------------------------- */
 window.addEventListener("load", () => {
   initApp();
 });

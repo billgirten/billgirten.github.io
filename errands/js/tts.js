@@ -1,3 +1,10 @@
+const voices = window.speechSynthesis.getVoices();
+console.log(voices);
+
+const warmUp = new SpeechSynthesisUtterance(" ");
+warmUp.volume = 0;
+window.speechSynthesis.speak(warmUp);
+
 let muted = false;
 
 export function setMuted(value) {
@@ -9,10 +16,10 @@ export function isMuted() {
 }
 
 export function speak(text, opts = {}) {
-  if (typeof window === "undefined") return;
-  if (!("speechSynthesis" in window)) return;
-  if (!text || muted) return;
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  if (!text) return;
 
+  window.speechSynthesis.cancel(); // clear queue
   const utter = new SpeechSynthesisUtterance(text);
   utter.rate = opts.rate ?? 1;
   utter.pitch = opts.pitch ?? 1;
