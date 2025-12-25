@@ -7,34 +7,52 @@
   ],
   "steps": [
     {
-      "instruction": "Head north on Main Street.",
-      "distance": 200,
-      "duration": 60,
-      "target": { "lat": 39.501, "lng": -76.1001 }
+      "distance": 195.1,
+      "duration": 46.8,
+      "type": 11,
+      "instruction": "Head west on Arthur Avenue",
+      "name": "Arthur Avenue",
+      "way_points": [0, 3]
     },
     {
-      "instruction": "Turn right onto Market Avenue.",
-      "distance": 300,
-      "duration": 90,
-      "target": { "lat": 39.5015, "lng": -76.102 }
+      "distance": 5022.3,
+      "duration": 366.8,
+      "type": 1,
+      "instruction": "Turn right onto Liberty Grove Road",
+      "name": "Liberty Grove Road",
+      "way_points": [3, 56]
     },
     {
-      "instruction": "Continue straight for 400 meters.",
-      "distance": 400,
-      "duration": 120,
-      "target": { "lat": 39.5015, "lng": -76.105 }
+      "distance": 16.1,
+      "duration": 5.8,
+      "type": 0,
+      "instruction": "Turn left onto McCauley Road",
+      "name": "McCauley Road",
+      "way_points": [56, 57]
     },
     {
-      "instruction": "Turn left into the shopping center.",
-      "distance": 150,
-      "duration": 45,
-      "target": { "lat": 39.502, "lng": -76.107 }
+      "distance": 1921.3,
+      "duration": 138.3,
+      "type": 5,
+      "instruction": "Turn slight right onto Love Run Road",
+      "name": "Love Run Road",
+      "way_points": [57, 76]
     },
     {
-      "instruction": "Proceed to the final destination.",
-      "distance": 200,
-      "duration": 60,
-      "target": { "lat": 39.503, "lng": -76.11 }
+      "distance": 163.9,
+      "duration": 11.8,
+      "type": 3,
+      "instruction": "Turn sharp right onto Colora Road",
+      "name": "Colora Road",
+      "way_points": [76, 79]
+    },
+    {
+      "distance": 0.0,
+      "duration": 0.0,
+      "type": 10,
+      "instruction": "Arrive at Colora Road, on the left",
+      "name": "-",
+      "way_points": [79, 79]
     }
   ],
   "segments": [],
