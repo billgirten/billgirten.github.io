@@ -1,6 +1,6 @@
 {
   "name": "Nav Gator",
-  "short_name": "Gator",
+  "short_name": "Nav Gator",
   "start_url": "/errands/",
   "scope": "/errands/",
   "display": "standalone",
