@@ -1,0 +1,43 @@
+{
+  "name": "BBES 207 PM Run",
+  "coordinates": [
+    { "lat": 39.5001, "lng": -76.1001 },
+    { "lat": 39.5015, "lng": -76.105 },
+    { "lat": 39.503, "lng": -76.11 }
+  ],
+  "steps": [
+    {
+      "instruction": "Head north on Main Street.",
+      "distance": 200,
+      "duration": 60,
+      "target": { "lat": 39.501, "lng": -76.1001 }
+    },
+    {
+      "instruction": "Turn right onto Market Avenue.",
+      "distance": 300,
+      "duration": 90,
+      "target": { "lat": 39.5015, "lng": -76.102 }
+    },
+    {
+      "instruction": "Continue straight for 400 meters.",
+      "distance": 400,
+      "duration": 120,
+      "target": { "lat": 39.5015, "lng": -76.105 }
+    },
+    {
+      "instruction": "Turn left into the shopping center.",
+      "distance": 150,
+      "duration": 45,
+      "target": { "lat": 39.502, "lng": -76.107 }
+    },
+    {
+      "instruction": "Proceed to the final destination.",
+      "distance": 200,
+      "duration": 60,
+      "target": { "lat": 39.503, "lng": -76.11 }
+    }
+  ],
+  "segments": [],
+  "totalDistance": 1250,
+  "totalDuration": 375
+}
