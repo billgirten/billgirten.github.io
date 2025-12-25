@@ -1,0 +1,88 @@
+{
+  "bbox": [-76.129735, 39.627789, -76.113898, 39.6879],
+  "routes": [
+    {
+      "summary": { "distance": 7318.7, "duration": 569.5 },
+      "segments": [
+        {
+          "distance": 7318.7,
+          "duration": 569.5,
+          "steps": [
+            {
+              "distance": 195.1,
+              "duration": 46.8,
+              "type": 11,
+              "instruction": "Head west on Arthur Avenue",
+              "name": "Arthur Avenue",
+              "way_points": [0, 3]
+            },
+            {
+              "distance": 5022.3,
+              "duration": 366.8,
+              "type": 1,
+              "instruction": "Turn right onto Liberty Grove Road",
+              "name": "Liberty Grove Road",
+              "way_points": [3, 56]
+            },
+            {
+              "distance": 16.1,
+              "duration": 5.8,
+              "type": 0,
+              "instruction": "Turn left onto McCauley Road",
+              "name": "McCauley Road",
+              "way_points": [56, 57]
+            },
+            {
+              "distance": 1921.3,
+              "duration": 138.3,
+              "type": 5,
+              "instruction": "Turn slight right onto Love Run Road",
+              "name": "Love Run Road",
+              "way_points": [57, 76]
+            },
+            {
+              "distance": 163.9,
+              "duration": 11.8,
+              "type": 3,
+              "instruction": "Turn sharp right onto Colora Road",
+              "name": "Colora Road",
+              "way_points": [76, 79]
+            },
+            {
+              "distance": 0.0,
+              "duration": 0.0,
+              "type": 10,
+              "instruction": "Arrive at Colora Road, on the left",
+              "name": "-",
+              "way_points": [79, 79]
+            }
+          ]
+        }
+      ],
+      "bbox": [-76.129735, 39.627789, -76.113898, 39.6879],
+      "geometry": "qzzpFhssoMVtANtDRrDiBLcA@aBOoIiAkBYgD]}BQ{Io@qCe@eCg@}Cc@wCq@_Co@aH{BuIcDgHeCc@KyEs@yBe@kFmAq^qIgCw@gAc@_JaEqGiBgBk@IE_@K[Ks@]aCqAu@UwAUmJmAoA[mIgDsAm@_CwAu@]{@YcCg@sEMm@G{@OaA[i@U{IcEqCmAe@U_J}D}@c@a@[a@e@UTcEPcQzAcFTkF^iABeDZsCPcALqDf@k@JyA`@c@FeFOeKBq@Dq@No@XiL~G}BpAt@mDD]BcD",
+      "way_points": [0, 79]
+    }
+  ],
+  "metadata": {
+    "attribution": "openrouteservice.org | OpenStreetMap contributors",
+    "service": "routing",
+    "timestamp": 1766436279281,
+    "query": {
+      "coordinates": [
+        [-76.127159, 39.627546],
+        [-76.115799, 39.687867]
+      ],
+      "profile": "driving-car",
+      "profileName": "driving-car",
+      "format": "json",
+      "instructions": true
+    },
+    "engine": {
+      "version": "9.5.0",
+      "build_date": "2025-10-31T12:33:09Z",
+      "graph_date": "2025-12-21T11:08:22Z",
+      "osm_date": "2025-12-15T01:00:00Z"
+    }
+  }
+}
