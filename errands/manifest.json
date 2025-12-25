@@ -1,19 +1,19 @@
 {
-  "name": "Errands Navigator",
-  "short_name": "Errands",
+  "name": "Nav Gator",
+  "short_name": "Gator",
   "start_url": "/errands/",
   "scope": "/errands/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#f4ca16",
+  "theme_color": "#f4ca16",
   "icons": [
     {
-      "src": "/errands/icons/icon-192.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/errands/icons/icon-512.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
