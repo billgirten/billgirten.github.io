@@ -4,15 +4,35 @@ import { createNavigator } from "./navigation.js";
 import { preloadRoutesIfNeeded } from "./preload.js";
 import { isMuted, setMuted } from "./tts.js";
 import {
-    renderRouteList,
-    setGeoStatus,
-    setStatus,
-    updateNavigationUI
+  renderRouteList,
+  setGeoStatus,
+  setStatus,
+  updateNavigationUI
 } from "./ui.js";
 
 let geoWatchId = null;
 let navigatorInstance = null;
 let activeRoute = null;
+let deferredPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+
+  const installBtn = document.getElementById("install-btn");
+  if (installBtn) installBtn.style.display = "inline-block";
+});
+
+export function installPWA() {
+  if (!deferredPrompt) return;
+
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => {
+    deferredPrompt = null;
+    const installBtn = document.getElementById("install-btn");
+    if (installBtn) installBtn.style.display = "none";
+  });
+}
 
 async function initServiceWorker() {
   if ("serviceWorker" in navigator) {
