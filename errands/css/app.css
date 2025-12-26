@@ -191,6 +191,12 @@ p {
     flex: 2;
     order: 1;
   }
+
+  p {
+    font-family: 'Roboto', sans-serif;
+    font-size: calc(1vw + 1vh);
+    padding: 1.75vh 1.75vw;
+  }
 }
 
 /* Landscape orientation */
