@@ -32,6 +32,36 @@ app.get("/geocode", async (req, res) => {
   }
 });
 
+app.get("/route", async (req, res) => {
+  const coords = req.query.coords;
+  if (!coords) return res.status(400).json({ error: "Missing coords" });
+
+  // coords arrives as: "-76.09,39.61|-76.10,39.67|..."
+  const pairs = coords.split("|").map(pair => {
+    const [lng, lat] = pair.split(",").map(Number);
+    return [lng, lat];
+  });
+
+  const url = "https://api.openrouteservice.org/v2/directions/driving-car";
+
+  try {
+    const orsRes = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": process.env.ORS_API_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ coordinates: pairs })
+    });
+
+    const data = await orsRes.json();
+    res.json(data);
+
+  } catch (err) {
+    res.status(500).json({ error: "ORS route failed", details: err.message });
+  }
+});
+
 app.listen(3001, () => {
   console.log("ORS Proxy running at http://localhost:3001");
 });
