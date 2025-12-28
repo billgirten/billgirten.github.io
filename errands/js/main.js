@@ -7,7 +7,7 @@ import {
   renderRouteList,
   setGeoStatus,
   setStatus,
-  updateNavigationUI
+  updateNavigationUI,
 } from "./ui.js";
 
 let geoWatchId = null;
@@ -68,11 +68,10 @@ async function initApp() {
   renderRouteList(routes, async (routeMeta) => {
     const fullRoute = await getRoute(routeMeta.id);
     if (!fullRoute) return;
-
     activeRoute = fullRoute;
-    navigatorInstance = createNavigator(fullRoute.steps, {
+    navigatorInstance = createNavigator(fullRoute.data.route.tts_steps, {
       proximityThresholdMeters: 20,
-      autoSpeak: true
+      autoSpeak: true,
     });
 
     navigatorInstance.onUpdate((state) => {
@@ -118,9 +117,9 @@ async function initApp() {
   geoWatchId = watchPosition(
     (pos) => {
       setGeoStatus(
-        `Lat: ${pos.lat.toFixed(5)}, Lng: ${pos.lng.toFixed(
-          5
-        )} (±${Math.round(pos.accuracy)}m)`
+        `Lat: ${pos.lat.toFixed(5)}, Lng: ${pos.lng.toFixed(5)} (±${Math.round(
+          pos.accuracy
+        )}m)`
       );
 
       if (navigatorInstance) {

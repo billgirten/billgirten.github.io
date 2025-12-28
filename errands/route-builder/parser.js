@@ -7,9 +7,9 @@ export function extractSubject(raw) {
 }
 
 // -----------------------------
-// STEP EXTRACTION
+// STOPS EXTRACTION
 // -----------------------------
-export function extractNumberedSteps(raw) {
+export function extractNumberedStops(raw) {
   const lines = raw.split(/\r?\n/);
   return lines
     .map((line) => line.trim())
@@ -19,10 +19,10 @@ export function extractNumberedSteps(raw) {
 // -----------------------------
 // ADDRESS EXTRACTION
 // -----------------------------
-export function extractAddresses(steps) {
-  return steps
-    .map((step) => {
-      const parts = step.split(" - ");
+export function extractAddresses(stops) {
+  return stops
+    .map((stop) => {
+      const parts = stop.split(" - ");
       if (parts.length < 3) return null;
       return parts.slice(2).join(" - ").trim();
     })
@@ -33,30 +33,16 @@ export function extractAddresses(steps) {
 // ADDRESS NORMALIZATION
 // -----------------------------
 function normalizeAddress(addr) {
-  return addr
-    .replace(/\(.*?\)/g, "")                // remove notes
-    .replace(/@/g, " and ")                 // replace @
-    .replace(/\s+/g, " ")                   // collapse spaces
-
-    // Add missing comma before city
-    .replace(/(Rd|Road|St|Street|Ave|Avenue|Dr|Drive|Ct|Court|Ln|Lane|Hwy|Highway)\s+Port Deposit/i,
-             "$1, Port Deposit")
-
-    // Normalize street suffixes
-    .replace(/\bROAD\b/gi, "Rd")
-    .replace(/\bSTREET\b/gi, "St")
-    .replace(/\bAVENUE\b/gi, "Ave")
-    .replace(/\bDRIVE\b/gi, "Dr")
-    .replace(/\bCOURT\b/gi, "Ct")
-    .replace(/\bLANE\b/gi, "Ln")
-    .replace(/\bHIGHWAY\b/gi, "Hwy")
-
-    // Title Case the whole string
-    .replace(/\b([A-Z])([A-Z]+)\b/g, (_, first, rest) => 
-      first + rest.toLowerCase()
-    )
-
+  let clean = addr
+    .replace(/\(.*?\)/g, "")        // remove notes
+    .replace(/@/g, " and ")         // replace @
+    .replace(/\s+/g, " ")           // collapse spaces
     .trim();
+
+  clean = clean.replace(/\b([A-Z])([A-Z]+)\b/g, (_, first, rest) =>
+    first + rest.toLowerCase()
+  );
+  return clean;
 }
 
 // -----------------------------

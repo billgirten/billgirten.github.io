@@ -6,59 +6,55 @@ dotenv.config();
 
 const app = express();
 
-/* -----------------------------
-   GEOCODE ENDPOINT (ORS Search)
------------------------------- */
+/* ------------------
+   GEOCODE ENDPOINT
+--------------------- */
 app.get("/geocode", async (req, res) => {
+  const address = req.query.address;
+  if (!address) {
+    return res.status(400).json({ error: "Missing address parameter" });
+  }
+
   try {
-    const address = req.query.address;
-    if (!address) {
-      return res.status(400).json({ error: "Missing address" });
-    }
+    // 1. LocationIQ Geocoding
+    const liqUrl = `https://us1.locationiq.com/v1/search?key=${process.env.LOCATIONIQ_KEY}&q=${encodeURIComponent(address)}&format=json&addressdetails=1&limit=1`;
 
-    const url = `https://api.openrouteservice.org/geocode/search?api_key=${process.env.ORS_API_KEY}&text=${encodeURIComponent(address)}&size=1`;
+    const liqResp = await fetch(liqUrl);
+    const liqData = await liqResp.json();
 
-    let orsRes;
-    try {
-      orsRes = await fetch(url);
-    } catch (err) {
-      console.error("ORS geocoder fetch failed:", err);
-      return res.status(500).json({ error: "ORS geocoder request failed" });
-    }
-
-    let data;
-    try {
-      data = await orsRes.json();
-    } catch (err) {
-      console.error("Failed to parse ORS geocoder JSON:", err);
-      return res.status(500).json({ error: "Invalid ORS geocoder response" });
-    }
-
-    const first = data?.features?.[0];
-    if (!first) {
-      console.warn("ORS geocoder returned no results for:", address);
+    if (!Array.isArray(liqData) || liqData.length === 0) {
       return res.json({ address, coords: null });
     }
 
-    const [lng, lat] = first.geometry.coordinates;
+    const { lat, lon } = liqData[0];
+    const rawCoords = [parseFloat(lon), parseFloat(lat)];
 
-    // Snap to road
-    let snapped;
-    try {
-      snapped = await snapToRoad([lng, lat]);
-    } catch (err) {
-      console.error("Snap-to-road failed:", err);
-      snapped = [lng, lat]; // fallback
-    }
+    // 2. ORS Snap-to-Road
+    const snapUrl = "https://api.openrouteservice.org/v2/snap/driving-car";
+    const snapResp = await fetch(snapUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `${process.env.ORS_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        coordinates: [rawCoords]
+      })
+    });
 
-    return res.json({
+    const snapData = await snapResp.json();
+
+    const snapped = snapData?.locations?.[0]?.location;
+    const finalCoords = snapped || rawCoords;
+
+    res.json({
       address,
-      coords: snapped
+      coords: finalCoords
     });
 
   } catch (err) {
-    console.error("Unexpected /geocode error:", err);
-    return res.status(500).json({ error: "Unexpected server error" });
+    console.error("Geocode error:", err);
+    res.status(500).json({ error: "Geocoding failed" });
   }
 });
 
@@ -105,7 +101,7 @@ app.get("/route", async (req, res) => {
       });
     }
 
-    console.log("ORS RESPONSE:", data);
+    // console.log("ORS RESPONSE:", data);
     return res.json(data);
 
   } catch (err) {

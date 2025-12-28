@@ -5,13 +5,21 @@ export function createNavigator(steps, options = {}) {
   const proximity = options.proximityThresholdMeters ?? 20;
   const autoSpeak = options.autoSpeak ?? true;
 
+  // Convert ORS coords [lng, lat] → { lat, lng }
+  const normalizedSteps = (steps || []).map((s) => ({
+    ...s,
+    target: s.coords
+      ? { lat: s.coords[1], lng: s.coords[0] }
+      : null
+  }));
+
   let index = 0;
   let finished = false;
-  let currentInstruction = steps?.[0]?.instruction || "";
+  let currentInstruction = normalizedSteps?.[0]?.instruction || "";
   let listeners = [];
 
-  if (steps && steps.length > 0) {
-    precacheInstructions(steps.map((s) => s.instruction));
+  if (normalizedSteps.length > 0) {
+    precacheInstructions(normalizedSteps.map((s) => s.instruction));
     if (autoSpeak && currentInstruction) speak(currentInstruction);
   }
 
@@ -25,8 +33,9 @@ export function createNavigator(steps, options = {}) {
       index,
       isFinished: finished,
       currentInstruction,
-      totalSteps: steps?.length || 0,
-      nextStep: steps && steps[index + 1] ? steps[index + 1] : null
+      totalSteps: normalizedSteps.length,
+      nextStep:
+        normalizedSteps[index + 1] ? normalizedSteps[index + 1] : null
     };
   }
 
@@ -39,9 +48,9 @@ export function createNavigator(steps, options = {}) {
   }
 
   function updatePosition(position) {
-    if (!steps || steps.length === 0 || finished) return;
+    if (normalizedSteps.length === 0 || finished) return;
 
-    const step = steps[index];
+    const step = normalizedSteps[index];
     if (!step) {
       finished = true;
       currentInstruction = "Route completed.";
@@ -50,7 +59,7 @@ export function createNavigator(steps, options = {}) {
       return;
     }
 
-    const target = step.target; // { lat, lng } precomputed
+    const target = step.target; // now correctly populated
     if (!target) {
       currentInstruction = step.instruction;
       notify();
@@ -61,15 +70,17 @@ export function createNavigator(steps, options = {}) {
 
     if (dist <= proximity) {
       const nextIndex = index + 1;
-      if (nextIndex >= steps.length) {
+
+      if (nextIndex >= normalizedSteps.length) {
         finished = true;
         currentInstruction = "Route completed.";
         speak("You have reached your final destination.");
       } else {
         index = nextIndex;
-        currentInstruction = steps[nextIndex].instruction;
+        currentInstruction = normalizedSteps[nextIndex].instruction;
         if (autoSpeak && currentInstruction) speak(currentInstruction);
       }
+
       notify();
     } else {
       currentInstruction = step.instruction;
@@ -78,9 +89,7 @@ export function createNavigator(steps, options = {}) {
   }
 
   function repeat() {
-    if (currentInstruction) {
-      speak(currentInstruction);
-    }
+    if (currentInstruction) speak(currentInstruction);
   }
 
   return {
