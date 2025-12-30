@@ -36,20 +36,22 @@ export function renderRouteList(routes, onSelectRoute) {
   select.appendChild(placeholder);
 
   // Add all route options
-  routes.forEach((route) => {
-    const opt = document.createElement("option");
-    opt.value = route.id;
+routes.forEach((route) => {
+  const opt = document.createElement("option");
+  opt.value = route.id;
 
-    // NEW: read distance from wrapped JSON
-    const meters = route.data?.route?.summary?.distance_meters ?? 0;
-    const km = (meters / 1000).toFixed(1);
+  // Read distance from wrapped JSON (miles for UI)
+  const miles =
+    route.data?.route?.summary?.distance_miles ?? 0;
 
-    // NEW: name fallback
-    const displayName = route.name || route.id || "Unnamed Route";
+  // Name fallback
+  const displayName = route.name || route.id || "Unnamed Route";
 
-    opt.textContent = `${displayName} (${km} km)`;
-    select.appendChild(opt);
-  });
+  // Show miles in label
+  opt.textContent = `${displayName} (${miles.toFixed(1)} mi)`;
+
+  select.appendChild(opt);
+});
 
   container.appendChild(select);
 

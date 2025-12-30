@@ -5,65 +5,12 @@ import {
   geocodeAddresses,
 } from "./parser.js";
 
-/* ---------------------------------------
-   VALHALLA → PWA TTS CONVERTER
----------------------------------------- */
+import { humanizeGoogleTTS } from "./humanize-google.js";
+import { convertGoogleToTTS } from "./tts-google.js";
 
-export function convertValhallaToTTS(valhallaJson) {
-  const trip = valhallaJson?.trip;
-  if (!trip || !trip.legs || trip.legs.length === 0) {
-    throw new Error("Invalid Valhalla response: missing trip legs");
-  }
-
-  const leg = trip.legs[0];
-
-  // Decode the polyline geometry for the entire leg
-  // Valhalla's shape is an encoded polyline string
-  if (!leg.shape) {
-    throw new Error("Invalid Valhalla response: missing leg.shape");
-  }
-
-  const shape = polyline.decode(leg.shape); // [ [lat, lng], ... ]
-
-  const maneuvers = leg.maneuvers || [];
-  const steps = maneuvers.map((m, index) => {
-    const endIndex = m.end_shape_index;
-    const coord = shape[endIndex];
-
-    const instruction =
-      m.verbal_pre_transition_instruction ||
-      m.instruction ||
-      "Continue";
-
-    return {
-      id: index,
-      instruction,
-      coords: coord ? [coord[1], coord[0]] : null, // [lng, lat]
-      distance: (m.length ?? 0) * 1609.34,         // miles → meters
-      duration: m.time ?? 0,                       // seconds
-      is_turn: m.type >= 1 && m.type <= 15,
-      is_arrival: m.type === 4,
-    };
-  });
-
-  const summary = trip.summary || {};
-  const totalDistanceMeters = (summary.length ?? 0) * 1609.34; // miles → meters
-  const totalDurationSeconds = summary.time ?? 0;
-
-  return {
-    summary: {
-      distance: totalDistanceMeters,
-      duration: totalDurationSeconds,
-    },
-    geometry: shape.map(([lat, lng]) => [lng, lat]), // [lng, lat]
-    tts_steps: steps,
-  };
-}
-
-/* ---------------------------------------
+/* ============================================================
    MAIN FILE INPUT HANDLER
----------------------------------------- */
-
+============================================================ */
 document.getElementById("emlInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -71,23 +18,17 @@ document.getElementById("emlInput").addEventListener("change", async (e) => {
   const raw = await file.text();
   const subject = extractSubject(raw);
 
-  // Phase 1 — Extract numbered stops
-  const stops = extractNumberedStops(raw);
-
-  // Phase 2 — Extract addresses
-  const addresses = extractAddresses(stops);
-
-  // Phase 3 — Geocode (via tiny server → LocationIQ → whatever backend)
+  const parsedStops = extractNumberedStops(raw);
+  const addresses = extractAddresses(parsedStops);
   const geocoded = await geocodeAddresses(addresses);
 
-  // Phase 4 — Build route via Stadia/Valhalla through tiny server
   let route = null;
   let finalOutput = null;
 
   try {
-    route = await buildRoute(geocoded); // returns { summary, geometry, tts_steps }
-
-    finalOutput = buildFinalJSON(subject, stops, geocoded, route);
+    console.log("GEOCODED BEFORE ROUTE:", geocoded);
+    route = await buildRoute(geocoded, parsedStops); // Google Directions → TTS
+    finalOutput = buildFinalJSON(subject, parsedStops, geocoded, route);
   } catch (err) {
     console.error("Route build failed:", err);
 
@@ -95,47 +36,38 @@ document.getElementById("emlInput").addEventListener("change", async (e) => {
       id: subject.replace(/[^a-z0-9\-]+/gi, "_"),
       name: subject,
       data: {
-        stops,
+        stops: parsedStops,
         route: { error: err.message },
       },
     };
   }
 
-  // Display JSON in UI
-  document.getElementById("output").textContent =
-    JSON.stringify(finalOutput, null, 2);
+  document.getElementById("output").textContent = JSON.stringify(
+    finalOutput,
+    null,
+    2
+  );
 
-  // Safe filename
   const safeName = subject.replace(/[^a-z0-9\-]+/gi, "_");
-
-  // Save JSON file
   saveJSON(finalOutput, `${safeName}.json`);
 });
 
-/* ---------------------------------------
-   BUILD ROUTE (Stadia / Valhalla)
----------------------------------------- */
-
-export async function buildRoute(geocoded) {
-  // Filter out failed geocodes
+/* ============================================================
+   BUILD ROUTE (Google Directions)
+============================================================ */
+export async function buildRoute(geocoded, parsedStops) {
   const valid = geocoded.filter((g) => g.coords !== null);
 
   if (valid.length < 2) {
     throw new Error("Not enough valid coordinates to build a route.");
   }
 
-  // Build coordinate string for tiny server: "lng,lat|lng,lat|..."
-  const coordString = valid
-    .map((g) => g.coords.join(",")) // [lng, lat]
-    .join("|");
+  const res = await fetch("http://localhost:3001/route", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ coords: valid.map((g) => g.coords) }),
+  });
 
-    console.log('>>> ABOUT TO CALL tiny server');
-
-  const url = `http://localhost:3001/route?coords=${encodeURIComponent(
-    coordString
-  )}`;
-
-  const res = await fetch(url);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(
@@ -143,24 +75,58 @@ export async function buildRoute(geocoded) {
     );
   }
 
-  const valhalla = await res.json();
+  const googleJson = await res.json();
 
-  // Normalize to PWA-friendly structure
-  return convertValhallaToTTS(valhalla);
+  // 1. Convert Google → raw TTS steps
+  const rawSteps = convertGoogleToTTS(googleJson);
+
+  // 2. Build FINAL stop objects (Option A)
+  const finalStops = parsedStops.map((step, i) => ({
+    label: step.split(" - ")[0],
+    address: geocoded[i]?.address ?? "",
+    coords: geocoded[i]?.coords ?? null,
+  }));
+
+  // 3. Humanize + label arrivals
+  const tts_steps = humanizeGoogleTTS(rawSteps, finalStops);
+
+  // 4. Summary
+  const leg = googleJson.routes[0].legs[0];
+  const summary = {
+    distance_meters: leg.distance.value,
+    distance_miles: leg.distance.value / 1609.34,
+    duration_seconds: leg.duration.value,
+  };
+
+  // 5. Geometry
+  const geometry = decodeGooglePolyline(
+    googleJson.routes[0].overview_polyline.points
+  );
+
+  return {
+    summary,
+    geometry,
+    tts_steps,
+  };
 }
 
-/* ---------------------------------------
-   FINAL JSON BUILDER (PWA-ready + UI wrapper)
----------------------------------------- */
+/* ============================================================
+   DECODE GOOGLE POLYLINE
+============================================================ */
+function decodeGooglePolyline(encoded) {
+  const decoded = polyline.decode(encoded); // [lat, lng]
+  return decoded.map(([lat, lng]) => [lng, lat]); // convert to [lng, lat]
+}
 
+/* ============================================================
+   FINAL JSON BUILDER
+============================================================ */
 export function buildFinalJSON(subject, parsedStops, geocoded, route) {
-  // route: { summary, geometry, tts_steps } from convertValhallaToTTS
-
   const stops = parsedStops.map((step, i) => {
     const geo = geocoded[i];
     return {
-      label: step.split(" - ")[0],  // "#1", "#2", etc.
-      time: step.split(" - ")[1],   // "7:58 AM"
+      label: step.split(" - ")[0],
+      time: step.split(" - ")[1],
       address: geo?.address ?? "",
       coords: geo?.coords ?? null,
     };
@@ -174,10 +140,7 @@ export function buildFinalJSON(subject, parsedStops, geocoded, route) {
     data: {
       stops,
       route: {
-        summary: {
-          distance_meters: route.summary.distance,
-          duration_seconds: route.summary.duration,
-        },
+        summary: route.summary,
         geometry: route.geometry,
         tts_steps: route.tts_steps,
       },
@@ -185,10 +148,9 @@ export function buildFinalJSON(subject, parsedStops, geocoded, route) {
   };
 }
 
-/* ---------------------------------------
+/* ============================================================
    SAVE JSON FILE
----------------------------------------- */
-
+============================================================ */
 function saveJSON(data, filename) {
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: "application/json",

@@ -6,9 +6,25 @@ dotenv.config();
 
 const app = express();
 
-/* ------------------
-   GEOCODE ENDPOINT
---------------------- */
+// REQUIRED for JSON POST bodies
+app.use(express.json());
+
+// CORS (you already added this)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "http://127.0.0.1:5500");
+  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.sendStatus(200);
+  next();
+});
+
+/* ============================================================
+   GEOCODE ENDPOINT (Google Geocoding API)
+   ------------------------------------------------------------
+   - Input: address string
+   - Output: { lat, lng }
+   - No snapping needed
+============================================================ */
 app.get("/geocode", async (req, res) => {
   const address = req.query.address;
   if (!address) {
@@ -16,243 +32,115 @@ app.get("/geocode", async (req, res) => {
   }
 
   try {
-    // 1. LocationIQ Geocoding
-    const liqUrl = `https://us1.locationiq.com/v1/search?key=${
-      process.env.LOCATIONIQ_KEY
-    }&q=${encodeURIComponent(address)}&format=json&addressdetails=1&limit=1`;
+    const url =
+      `https://maps.googleapis.com/maps/api/geocode/json?address=` +
+      encodeURIComponent(address) +
+      `&key=${process.env.GOOGLE_MAPS_API_KEY}`;
 
-    const liqResp = await fetch(liqUrl);
-    const liqData = await liqResp.json();
+    const geoResp = await fetch(url);
+    const geoData = await geoResp.json();
 
-    if (!Array.isArray(liqData) || liqData.length === 0) {
+    console.log("Google Geocode raw:", geoData);
+
+    if (!geoData.results || geoData.results.length === 0) {
       return res.json({ address, coords: null });
     }
 
-    const { lat, lon } = liqData[0];
-    const rawCoords = [parseFloat(lon), parseFloat(lat)];
-
-    // 2. ORS Snap-to-Road
-    const snapUrl = "https://api.openrouteservice.org/v2/snap/driving-car";
-    const snapResp = await fetch(snapUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `${process.env.ORS_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        coordinates: [rawCoords],
-      }),
-    });
-
-    const snapData = await snapResp.json();
-
-    const snapped = snapData?.locations?.[0]?.location;
-    const finalCoords = snapped || rawCoords;
+    const { lat, lng } = geoData.results[0].geometry.location;
 
     res.json({
       address,
-      coords: finalCoords,
+      coords: [lng, lat], // your app expects [lng, lat]
     });
+
   } catch (err) {
-    console.error("Geocode error:", err);
+    console.error("Google geocode error:", err);
     res.status(500).json({ error: "Geocoding failed" });
   }
 });
 
-/* -----------------------------
-   ROUTE ENDPOINT (ORS Directions)
------------------------------- */
-// app.get("/route", async (req, res) => {
-//   const coords = req.query.coords;
-//   if (!coords) {
-//     return res.status(400).json({ error: "Missing coords" });
-//   }
+/* ============================================================
+   ROUTE ENDPOINT (Google Directions API)
+   ------------------------------------------------------------
+   - Input: { coords: [[lng, lat], [lng, lat], ...] }
+   - Output: Raw Google Directions JSON
+   - Uses driving mode, imperial units
+============================================================ */
+app.post("/route", async (req, res) => {
+  const coords = req.body.coords;
 
-//   const pairs = coords.split("|").map((pair) => {
-//     const [lng, lat] = pair.split(",").map(Number);
-//     return [lng, lat];
-//   });
-
-//   const url = "https://api.openrouteservice.org/v2/directions/driving-car";
-
-//   try {
-//     const orsRes = await fetch(url, {
-//       method: "POST",
-//       headers: {
-//         Authorization: process.env.ORS_API_KEY,
-//         "Content-Type": "application/json",
-//       },
-//       body: JSON.stringify({
-//         coordinates: pairs,
-//         instructions: true,
-//         maneuvers: true,
-//         preference: "recommended",
-//         units: "m",
-//         extra_info: ["waytype", "steepness"],
-//       }),
-//     });
-
-//     const data = await orsRes.json();
-
-//     if (!data?.routes?.length) {
-//       console.error("ORS Directions returned no routes:", data);
-//       return res.status(500).json({
-//         error: "No route returned",
-//         details: data
-//       });
-//     }
-
-//     // console.log("ORS RESPONSE:", data);
-//     return res.json(data);
-
-//   } catch (err) {
-//     console.error("ORS route failed:", err);
-//     return res.status(500).json({
-//       error: "ORS route failed",
-//       details: err.message
-//     });
-//   }
-// });
-
-/* ------------------------------------
-   ROUTE ENDPOINT (Valhalla Directions)
---------------------------------------- */
-app.get("/route", async (req, res) => {
-  const coords = req.query.coords;
-  if (!coords) {
-    return res.status(400).json({ error: "Missing coords" });
+  if (!coords || !Array.isArray(coords) || coords.length < 2) {
+    return res.status(400).json({ error: "Missing or invalid coords" });
   }
 
-  // coords arrives as: "-76.09,39.61|-76.10,39.67|..."
-  const pairs = coords.split("|").map(pair => {
-    const [lng, lat] = pair.split(",").map(Number);
-    return { lon: lng, lat: lat, type: "break" };
-  });
-
-  const url = `https://api.stadiamaps.com/route/v1?api_key=${process.env.STADIA_API_KEY}`;
-
-  const body = {
-    locations: pairs,
-    costing: "auto",
-    costing_options: {
-      auto: { use_highways: 0.3 }
-    },
-    units: "miles"
-  };
+  console.log("REQ BODY /route:", req.body);
 
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      return res.status(response.status).json({
-        error: "Stadia routing failed",
-        status: response.status,
-        details: text
-      });
-    }
-
-    const data = await response.json();
+    const data = await routeWithGoogle(coords); // coords: [[lng, lat], ...]
     res.json(data);
-
   } catch (err) {
-    res.status(500).json({
-      error: "Server routing error",
-      details: err.message
-    });
+    console.error("Google route error:", err);
+    res.status(500).json({ error: "Google routing failed" });
   }
 });
 
-async function routeWithStadia(coords) {
-  const url = `https://api.stadiamaps.com/route/v1?api_key=${process.env.STADIA_API_KEY}`;
+/* ============================================================
+   HELPER: Routing via Google Directions API
+============================================================ */
+async function routeWithGoogle(coords) {
+  // coords are [[lng, lat], ...], but Google wants "lat,lng"
+  const toLatLng = ([lng, lat]) => `${lat},${lng}`;
 
-  const body = {
-    locations: coords.map(([lng, lat]) => ({
-      lon: lng,
-      lat,
-      type: "break",
-    })),
-    costing: "auto",
-    costing_options: {
-      auto: {
-        use_highways: 0.3,
-      },
-    },
-    units: "miles",
-    // Optionally:
-    // format: "osrm", // if you want OSRM-style maneuvers
-  };
+  const origin = toLatLng(coords[0]);
+  const destination = toLatLng(coords[coords.length - 1]);
 
-console.log("3. Inside routeWithStadia");
-console.log("4. About to call fetch...");
+  // Any points between first and last become waypoints
+  const waypointCoords = coords.slice(1, -1);
+  const waypoints =
+    waypointCoords.length > 0
+      ? waypointCoords.map(toLatLng).join("|")
+      : null;
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-console.log("5. Fetch sent");
-console.log("6. Fetch returned:", res.status);
+  const baseUrl = "https://maps.googleapis.com/maps/api/directions/json";
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    console.error("Stadia response:", res.status, text);
-    throw new Error(`Stadia routing failed: ${res.status}`);
-  }
-
-  return res.json();
-}
-
-/* -----------------------------
-   SNAP-TO-ROAD HELPER
------------------------------- */
-async function snapToRoad([lng, lat]) {
-  try {
-    const url = `https://api.openrouteservice.org/v2/snap/driving-car?point=${lat},${lng}`;
-
-    const res = await fetch(url, {
-      headers: {
-        Authorization: process.env.ORS_API_KEY,
-        "Content-Type": "application/json",
-      },
-    });
-
-    const data = await res.json();
-    const snapped = data?.snapped_point?.coordinates;
-
-    return snapped || [lng, lat];
-  } catch (err) {
-    console.error("Snap-to-road error:", err);
-    return [lng, lat]; // fallback
-  }
-}
-
-async function snapWithStadia(coords) {
-  const url = `https://api.stadiamaps.com/trace_route/v1/driving?api_key=${process.env.STADIA_API_KEY}`;
-
-  const body = {
-    shape: coords.map(([lng, lat]) => ({ lon: lng, lat })),
-  };
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  const params = new URLSearchParams({
+    origin,
+    destination,
+    mode: "driving",
+    units: "imperial",
+    key: process.env.GOOGLE_MAPS_API_KEY,
   });
 
-  if (!res.ok) throw new Error(`Snap failed: ${res.status}`);
-  return res.json();
+  if (waypoints) {
+    // If you want Google to preserve order, leave as-is.
+    // If you want optimized order, prepend "optimize:true|".
+    params.append("waypoints", waypoints);
+    // For optimization instead:
+    // params.append("waypoints", "optimize:true|" + waypoints);
+  }
+
+  const url = `${baseUrl}?${params.toString()}`;
+
+  const resp = await fetch(url);
+  const json = await resp.json();
+
+  console.log("=== RAW GOOGLE DIRECTIONS RESPONSE START ===");
+  console.log(JSON.stringify(json, null, 2));
+  console.log("=== RAW GOOGLE DIRECTIONS RESPONSE END ===");
+
+  // Basic sanity check
+  if (json.status !== "OK") {
+    throw new Error(`Google Directions error: ${json.status} (${json.error_message || "no message"})`);
+  }
+
+  return json;
 }
 
-/* -----------------------------
+/* ============================================================
    START SERVER
------------------------------- */
+============================================================ */
 app.listen(3001, () => {
-  console.log("ORS Proxy running at http://localhost:3001");
+  console.log(
+    "Tiny server running at http://localhost:3001 (Google routing enabled)"
+  );
 });
