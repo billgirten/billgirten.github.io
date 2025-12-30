@@ -2,15 +2,13 @@ import { haversine } from "./geo.js";
 import { precacheInstructions, speak } from "./tts.js";
 
 export function createNavigator(steps, options = {}) {
-  const proximity = options.proximityThresholdMeters ?? 20;
+  const baseProximity = options.proximityThresholdMeters ?? 20;
   const autoSpeak = options.autoSpeak ?? true;
 
   // Convert ORS coords [lng, lat] → { lat, lng }
   const normalizedSteps = (steps || []).map((s) => ({
     ...s,
-    target: s.coords
-      ? { lat: s.coords[1], lng: s.coords[0] }
-      : null
+    target: s.coords ? { lat: s.coords[1], lng: s.coords[0] } : null,
   }));
 
   let index = 0;
@@ -34,8 +32,7 @@ export function createNavigator(steps, options = {}) {
       isFinished: finished,
       currentInstruction,
       totalSteps: normalizedSteps.length,
-      nextStep:
-        normalizedSteps[index + 1] ? normalizedSteps[index + 1] : null
+      nextStep: normalizedSteps[index + 1] ? normalizedSteps[index + 1] : null,
     };
   }
 
@@ -59,15 +56,38 @@ export function createNavigator(steps, options = {}) {
       return;
     }
 
-    const target = step.target; // now correctly populated
+    const target = step.target;
     if (!target) {
       currentInstruction = step.instruction;
       notify();
       return;
     }
 
+    // Dynamic threshold
+    const accuracy = position.accuracy ?? 15;
+    const proximity = Math.max(baseProximity, accuracy * 1.5);
+
     const dist = haversine(position, target);
 
+    // ------------------------------------------------------------
+    // PASS-THROUGH LOGIC
+    // ------------------------------------------------------------
+    const next = normalizedSteps[index + 1];
+    if (next) {
+      const distToNext = haversine(position, next.target);
+
+      if (distToNext < dist) {
+        index++;
+        currentInstruction = next.instruction;
+        if (autoSpeak && currentInstruction) speak(currentInstruction);
+        notify();
+        return;
+      }
+    }
+
+    // ------------------------------------------------------------
+    // NORMAL PROXIMITY LOGIC
+    // ------------------------------------------------------------
     if (dist <= proximity) {
       const nextIndex = index + 1;
 
@@ -96,6 +116,6 @@ export function createNavigator(steps, options = {}) {
     onUpdate,
     updatePosition,
     repeat,
-    getState
+    getState,
   };
 }
