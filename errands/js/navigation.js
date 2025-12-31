@@ -5,10 +5,10 @@ export function createNavigator(steps, options = {}) {
   const baseProximity = options.proximityThresholdMeters ?? 20;
   const autoSpeak = options.autoSpeak ?? true;
 
-  // Convert ORS coords [lng, lat] → { lat, lng }
+  // Convert Google coords [lng, lat] → { lat, lng }
   const normalizedSteps = (steps || []).map((s) => ({
     ...s,
-    target: s.coords ? { lat: s.coords[1], lng: s.coords[0] } : null,
+    target: s.end ? { lat: s.end[1], lng: s.end[0] } : null,
   }));
 
   let index = 0;
@@ -106,6 +106,20 @@ export function createNavigator(steps, options = {}) {
       currentInstruction = step.instruction;
       notify();
     }
+
+    debugLog(
+      `GPS: lat=${position.lat.toFixed(6)}, lng=${position.lng.toFixed(
+        6
+      )}, acc=${position.accuracy}`
+    );
+
+    debugLog(
+      `Step ${index}: dist=${dist.toFixed(1)}m, prox=${proximity.toFixed(1)}m`
+    );
+
+    debugLog(`Target: ${target.lat.toFixed(6)}, ${target.lng.toFixed(6)}`);
+
+    debugLog(`Next step: ${next?.instruction || "none"}`);
   }
 
   function repeat() {
@@ -118,4 +132,13 @@ export function createNavigator(steps, options = {}) {
     repeat,
     getState,
   };
+}
+
+function debugLog(msg) {
+  const el = document.getElementById("debug");
+  if (!el) return;
+
+  const timestamp = new Date().toLocaleTimeString();
+  el.value += `[${timestamp}] ${msg}\n`;
+  el.scrollTop = el.scrollHeight; // auto-scroll to bottom
 }
