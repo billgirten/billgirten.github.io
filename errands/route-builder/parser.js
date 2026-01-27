@@ -2,32 +2,32 @@
 // SUBJECT EXTRACTION
 // -----------------------------
 export function extractSubject(raw) {
-  const match = raw.match(/^Subject:\s*(.*)$/m);
-  return match ? match[1].trim() : "Route";
+  const match = raw.match(/^Subject:\s*(.+)$/m);
+  return match ? match[1].trim() : "Untitled Route";
 }
 
 // -----------------------------
 // STOPS EXTRACTION
 // -----------------------------
 export function extractNumberedStops(raw) {
-  const lines = raw.split(/\r?\n/);
-  return lines
-    .map((line) => line.trim())
-    .filter((line) => /^#\d+/.test(line));
+  // Split header and body at the first blank line
+  const parts = raw.split(/\r?\n\r?\n/);
+  const body = parts[1] || raw;
+
+  return body
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => /^#\d+\s*-/.test(line));
 }
 
 // -----------------------------
 // ADDRESS EXTRACTION
 // -----------------------------
 export function extractAddresses(stops) {
-  return stops
-    .map((stop) => {
-      const normalized = stop.replace(/[–—−]/g, "-");
-      const parts = normalized.split(" - ");
-      if (parts.length < 3) return null;
-      return parts.slice(2).join(" - ").trim();
-    })
-    .filter(Boolean);
+  return stops.map(stop => {
+    const parts = stop.split(" - ");
+    return parts[1] ? parts[1].trim() : stop.trim();
+  });
 }
 
 // -----------------------------

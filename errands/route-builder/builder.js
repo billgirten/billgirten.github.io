@@ -56,57 +56,100 @@ document.getElementById("emlInput").addEventListener("change", async (e) => {
    BUILD ROUTE (Google Directions)
 ============================================================ */
 export async function buildRoute(geocoded, parsedStops) {
-  const valid = geocoded.filter((g) => g.coords !== null);
+  const valid = geocoded.filter(g => g.coords !== null);
 
   if (valid.length < 2) {
     throw new Error("Not enough valid coordinates to build a route.");
   }
 
-  const res = await fetch("http://localhost:3001/route", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ coords: valid.map((g) => g.coords) }),
-  });
+  // ------------------------------------------------------------
+  // 1. Chunk coordinates into groups of ≤ 25 waypoints
+  // ------------------------------------------------------------
+  const CHUNK_LIMIT = 25; // Google max waypoints
+  const chunks = [];
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `Tiny server routing failed: ${res.status}${text ? ` - ${text}` : ""}`
-    );
+  for (let i = 0; i < valid.length; i += CHUNK_LIMIT) {
+    const slice = valid.slice(i, i + CHUNK_LIMIT + 1);
+
+    // Ensure overlap: last point of previous chunk = first of next
+    if (i > 0) {
+      slice.unshift(valid[i - 1]);
+    }
+
+    chunks.push(slice);
   }
 
-  const googleJson = await res.json();
+  // ------------------------------------------------------------
+  // 2. Fetch Google Directions for each chunk
+  // ------------------------------------------------------------
+  const segmentResults = [];
 
-  // 1. Convert Google → raw TTS steps
-  const rawSteps = convertGoogleToTTS(googleJson);
+  for (const coordsChunk of chunks) {
+    const res = await fetch("http://localhost:3001/route", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coords: coordsChunk.map(g => g.coords) })
+    });
 
-  // 2. Build FINAL stop objects (Option A)
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(
+        `Routing failed: ${res.status}${text ? ` - ${text}` : ""}`
+      );
+    }
+
+    const googleJson = await res.json();
+    segmentResults.push(googleJson);
+  }
+
+  // ------------------------------------------------------------
+  // 3. Convert each Google segment → TTS steps
+  // ------------------------------------------------------------
+  const allRawSteps = [];
+  const allGeometry = [];
+  let totalDistance = 0;
+  let totalDuration = 0;
+
+  for (const segment of segmentResults) {
+    const leg = segment.routes[0].legs[0];
+
+    totalDistance += leg.distance.value;
+    totalDuration += leg.duration.value;
+
+    // Geometry
+    const geom = decodeGooglePolyline(segment.routes[0].overview_polyline.points);
+    allGeometry.push(...geom);
+
+    // Raw TTS steps
+    const rawSteps = convertGoogleToTTS(segment);
+    allRawSteps.push(...rawSteps);
+  }
+
+  // ------------------------------------------------------------
+  // 4. Build final stop objects
+  // ------------------------------------------------------------
   const finalStops = parsedStops.map((step, i) => ({
     label: step.split(" - ")[0],
     address: geocoded[i]?.address ?? "",
-    coords: geocoded[i]?.coords ?? null,
+    coords: geocoded[i]?.coords ?? null
   }));
 
-  // 3. Humanize + label arrivals
-  const tts_steps = humanizeGoogleTTS(rawSteps, finalStops);
+  // ------------------------------------------------------------
+  // 5. Humanize TTS steps
+  // ------------------------------------------------------------
+  const tts_steps = humanizeGoogleTTS(allRawSteps, finalStops);
 
-  // 4. Summary
-  const leg = googleJson.routes[0].legs[0];
-  const summary = {
-    distance_meters: leg.distance.value,
-    distance_miles: leg.distance.value / 1609.34,
-    duration_seconds: leg.duration.value,
-  };
-
-  // 5. Geometry
-  const geometry = decodeGooglePolyline(
-    googleJson.routes[0].overview_polyline.points
-  );
-
+  // ------------------------------------------------------------
+  // 6. Final merged route object
+  // ------------------------------------------------------------
   return {
-    summary,
-    geometry,
-    tts_steps,
+    summary: {
+      distance_meters: totalDistance,
+      distance_miles: totalDistance / 1609.34,
+      duration_seconds: totalDuration
+    },
+    geometry: allGeometry,
+    tts_steps
   };
 }
 
